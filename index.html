@@ -3,275 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Station Analytics Pro - Maximum UI</title>
+    <title>Station Analytics Pro - Updated</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&family=JetBrains+Mono:wght@700&display=swap');
-        
-        :root {
-            --bg-deep: #0b1120;
-            --glass-bg: rgba(30, 41, 59, 0.7);
-        }
-
-        body { 
-            background: var(--bg-deep); 
-            color: #f1f5f9; 
-            font-family: 'Inter', sans-serif;
-            letter-spacing: -0.02em;
-        }
-
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        
-        .glass { 
-            background: var(--glass-bg); 
-            backdrop-filter: blur(16px); 
-            border: 1px solid rgba(255,255,255,0.08); 
-            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
-        }
-
-        .tab-active { 
-            color: #3b82f6; 
-            border-bottom: 4px solid #3b82f6; 
-            padding-bottom: 12px;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-        .stat-card {
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .stat-card:hover { transform: translateY(-5px); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { background: #0b1120; color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .tab-active { color: #3b82f6; border-bottom: 3px solid #3b82f6; font-weight: 900; }
+        .clickable-row:hover { background: rgba(59, 130, 246, 0.1); cursor: pointer; }
+        #popover-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; }
+        #popover-overlay.active { display: flex; }
     </style>
 </head>
-<body class="p-4 md:p-10">
+<body class="p-4 md:p-8">
 
-    <div id="detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-        <div class="glass w-full max-w-5xl max-h-[85vh] rounded-[2rem] overflow-hidden flex flex-col border border-white/20">
-            <div class="p-8 border-b border-white/10 flex justify-between items-center bg-blue-600/10">
-                <div>
-                    <h2 id="m-carrier-id" class="text-3xl font-black italic tracking-tighter text-white">CARRIER_ID</h2>
-                    <p class="text-blue-400 text-xs font-black uppercase tracking-[0.3em]">Full Process Traceability Log</p>
-                </div>
-                <button onclick="closeModal()" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white text-2xl font-black transition-all">&times;</button>
+    <div id="popover-overlay" onclick="hideErrorPopover()">
+        <div class="glass max-w-md w-full p-8 rounded-3xl border-t-2 border-red-500" onclick="event.stopPropagation()">
+            <div id="popover-content" class="text-sm font-bold text-white"></div>
+        </div>
+    </div>
+
+    <div id="fail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div class="glass w-full max-w-3xl max-h-[80vh] rounded-3xl overflow-hidden flex flex-col">
+            <div class="p-6 border-b border-white/10 flex justify-between items-center bg-blue-500/10">
+                <h2 id="modal-carrier-id" class="text-xl font-black text-white italic">Details</h2>
+                <button onclick="closeModal()" class="text-white text-2xl">&times;</button>
             </div>
-            <div class="p-8 overflow-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="text-[10px] text-slate-500 font-black uppercase tracking-widest border-b border-white/10">
-                            <th class="pb-4">Station</th>
-                            <th class="pb-4">Tester / Machine</th>
-                            <th class="pb-4">Result</th>
-                            <th class="pb-4">Error Description</th>
-                            <th class="pb-4 text-right">Timestamp</th>
-                        </tr>
-                    </thead>
-                    <tbody id="m-body" class="text-sm font-semibold divide-y divide-white/5">
-                        </tbody>
+            <div class="p-6 overflow-auto">
+                <table class="w-full text-left text-xs font-mono">
+                    <tbody id="modal-table-body" class="text-slate-300"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-black text-white mb-6 uppercase">Station<span class="text-blue-500">Live</span></h1>
         
-        <header class="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
-            <div>
-                <div class="flex items-center gap-3 mb-2">
-                    <div class="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                    <span class="text-blue-500 font-black text-xs uppercase tracking-[0.4em]">Live System Architecture</span>
-                </div>
-                <h1 class="text-5xl font-black text-white italic tracking-tighter uppercase">
-                    Station<span class="text-blue-600">Analytics</span>
-                </h1>
-            </div>
-            <div class="flex gap-4">
-                <div class="glass px-6 py-3 rounded-2xl border-l-4 border-blue-600">
-                    <p class="text-[9px] font-black text-slate-500 uppercase mb-1">Status</p>
-                    <p class="text-sm font-black text-white uppercase italic">Active Demo</p>
-                </div>
-                <div class="glass px-6 py-3 rounded-2xl border-l-4 border-emerald-500">
-                    <p class="text-[9px] font-black text-slate-500 uppercase mb-1">Database</p>
-                    <p class="text-sm font-black text-white uppercase italic">100 Records Loaded</p>
-                </div>
-            </div>
-        </header>
-
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            <div class="glass p-8 rounded-[2rem] stat-card border-t border-white/10">
-                <p class="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Total Input</p>
-                <p class="text-5xl font-black font-mono text-white tracking-tighter">100</p>
-            </div>
-            <div class="glass p-8 rounded-[2rem] stat-card border-t-4 border-emerald-500/50 bg-emerald-500/5">
-                <p class="text-xs font-black text-emerald-500 uppercase tracking-widest mb-2">Pass Total</p>
-                <p class="text-5xl font-black font-mono text-emerald-400 tracking-tighter">87</p>
-            </div>
-            <div class="glass p-8 rounded-[2rem] stat-card border-t-4 border-red-500/50 bg-red-500/5">
-                <p class="text-xs font-black text-red-500 uppercase tracking-widest mb-2">Fail Total</p>
-                <p class="text-5xl font-black font-mono text-red-500 tracking-tighter">13</p>
-            </div>
-            <div class="glass p-8 rounded-[2rem] stat-card border-t-4 border-blue-500/50 bg-blue-500/5">
-                <p class="text-xs font-black text-blue-500 uppercase tracking-widest mb-2">Yield Rate</p>
-                <p class="text-5xl font-black font-mono text-blue-400 tracking-tighter">87.0<span class="text-2xl">%</span></p>
+        <div class="flex gap-4 mb-6">
+            <div id="drop-zone" class="flex-1 h-16 border-2 border-dashed border-slate-700 rounded-2xl flex items-center justify-center cursor-pointer hover:border-blue-500">
+                <span id="drop-text" class="text-slate-400 font-bold">Drop Log File Here</span>
+                <input type="file" id="file-input" class="hidden" accept=".csv,.txt">
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <div class="lg:col-span-4 space-y-8">
-                <div class="glass p-8 rounded-[2rem]">
-                    <h3 class="text-xs font-black text-red-500 uppercase tracking-[0.2em] mb-6">Top 5 Failure Mode (Pareto)</h3>
-                    <div class="space-y-4">
-                        <div class="group flex justify-between items-center bg-white/5 p-4 rounded-2xl hover:bg-red-500/10 border-l-4 border-red-500 transition-all cursor-help">
-                            <span class="font-black text-sm text-white uppercase italic">Voltage Leakage</span>
-                            <span class="font-mono font-black text-red-400">05</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-white/5 p-4 rounded-2xl border-l-4 border-red-500/50">
-                            <span class="font-black text-sm text-white uppercase italic">Vision Reject</span>
-                            <span class="font-mono font-black text-red-400">03</span>
-                        </div>
-                        <div class="flex justify-between items-center bg-white/5 p-4 rounded-2xl border-l-4 border-red-500/30">
-                            <span class="font-black text-sm text-white uppercase italic">RFID Timeout</span>
-                            <span class="font-mono font-black text-red-400">03</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="glass p-8 rounded-[2rem]">
-                    <h3 class="text-xs font-black text-blue-500 uppercase tracking-[0.2em] mb-6">Process Distribution</h3>
-                    <div id="pie-chart" style="width: 100%; height: 300px;"></div>
-                </div>
-            </div>
-
-            <div class="lg:col-span-8">
-                <div class="glass rounded-[2rem] overflow-hidden flex flex-col h-full border border-white/5">
-                    <div class="p-6 bg-white/5 border-b border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div class="flex gap-6">
-                            <button class="text-xs font-black uppercase tab-active tracking-widest">Carrier List</button>
-                            <button class="text-xs font-black uppercase text-slate-500 tracking-widest hover:text-white transition-colors">Station Rank</button>
-                        </div>
-                        <div class="relative w-full md:w-72">
-                            <input type="text" id="search" oninput="updateTable()" placeholder="SEARCH CARRIER ID..." class="w-full bg-slate-900 border border-white/10 rounded-xl px-5 py-3 text-xs font-black text-white focus:border-blue-500 outline-none transition-all placeholder:text-slate-600">
-                        </div>
-                    </div>
-                    
-                    <div class="overflow-auto flex-grow max-h-[700px]">
-                        <table class="w-full text-left">
-                            <thead class="sticky top-0 bg-slate-800/90 backdrop-blur-md z-10">
-                                <tr class="text-[10px] text-slate-500 font-black uppercase tracking-widest">
-                                    <th class="p-6">Carrier Identification</th>
-                                    <th class="p-6 text-center">Process Count</th>
-                                    <th class="p-6 text-right">Last Status</th>
-                                    <th class="p-6 text-right">Detail</th>
-                                </tr>
-                            </thead>
-                            <tbody id="table-body" class="divide-y divide-white/5">
-                                </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-        </div>
+        <div id="station-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
     </div>
 
     <script>
-        // Mock Data for Demo
-        const demoData = [];
-        const stations = ['OP10_LOAD', 'OP20_VIS', 'OP30_TEST', 'OP40_LASER'];
-        const testers = ['TESTER-A1', 'TESTER-B2', 'PC-09', 'MC-PRO-01'];
-        const errors = ['UNDER_VOLT', 'CURR_HIGH', 'COMM_FAIL', 'VIS_BLUR'];
+        let rawData = [];
+        let pieChart = echarts.init(document.createElement('div')); // Placeholder
 
-        // สร้างข้อมูล 100 แถว
-        for(let i=1; i<=100; i++) {
-            const isPass = Math.random() > 0.13;
-            const carrier = 'CARR-' + (1000 + Math.floor(i/3)).toString();
-            demoData.push({
-                id: carrier,
-                st: stations[Math.floor(Math.random()*4)],
-                ts: testers[Math.floor(Math.random()*4)],
-                res: isPass,
-                msg: isPass ? 'SUCCESS' : errors[Math.floor(Math.random()*4)],
-                time: new Date().toLocaleTimeString('en-GB')
-            });
-        }
+        // ฟังก์ชันใหม่: สำหรับกดดูรายละเอียดจาก Station Grid
+        function showStationData(station, status) {
+            const filteredData = rawData.filter(d => 
+                d.station === station && (status === 'PASS' ? d.result : !d.result)
+            );
 
-        const pie = echarts.init(document.getElementById('pie-chart'), 'dark');
-
-        function updateTable() {
-            const query = document.getElementById('search').value.toUpperCase();
+            document.getElementById('modal-carrier-id').innerText = `${station} - ${status}`;
+            document.getElementById('modal-table-body').innerHTML = filteredData.length ? filteredData.map(d => `
+                <tr class="border-b border-white/5">
+                    <td class="py-3 text-blue-400 font-bold">${d.carrier}</td>
+                    <td class="py-3 text-emerald-400 font-bold">${d.tester}</td>
+                    <td class="py-3">${d.seq}</td>
+                    <td class="py-3 text-white">${d.title}</td>
+                </tr>`).join('') : '<tr><td class="p-8 text-center">No Data</td></tr>';
             
-            // Group by Carrier
-            const grouped = {};
-            demoData.forEach(d => {
-                if(!grouped[d.id]) grouped[d.id] = { total: 0, fail: 0 };
-                grouped[d.id].total++;
-                if(!d.res) grouped[d.id].fail++;
-            });
-
-            const html = Object.entries(grouped)
-                .filter(([id]) => id.includes(query))
-                .map(([id, s]) => `
-                <tr class="group hover:bg-blue-600/5 transition-colors">
-                    <td class="p-6">
-                        <p class="text-sm font-black text-blue-400 italic">${id}</p>
-                        <p class="text-[9px] text-slate-500 font-bold uppercase mt-1">RFID Tracked</p>
-                    </td>
-                    <td class="p-6 text-center">
-                        <span class="font-mono font-black text-white bg-white/5 px-3 py-1 rounded-lg">${s.total}</span>
-                    </td>
-                    <td class="p-6 text-right">
-                        <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase ${s.fail > 0 ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-500'}">
-                            ${s.fail > 0 ? 'FAIL DETECTED' : 'PASS'}
-                        </span>
-                    </td>
-                    <td class="p-6 text-right">
-                        <button onclick="openDetails('${id}')" class="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Expand</button>
-                    </td>
-                </tr>
-            `).join('');
-            document.getElementById('table-body').innerHTML = html;
-
-            // Chart Update
-            pie.setOption({
-                backgroundColor: 'transparent',
-                series: [{
-                    type: 'pie', radius: ['60%', '85%'],
-                    itemStyle: { borderRadius: 10, borderColor: '#0b1120', borderWidth: 4 },
-                    label: { show: false },
-                    data: [
-                        { value: 87, itemStyle: { color: '#10b981' } },
-                        { value: 13, itemStyle: { color: '#ef4444' } }
-                    ]
-                }]
-            });
+            document.getElementById('fail-modal').classList.remove('hidden');
         }
 
-        function openDetails(id) {
-            const logs = demoData.filter(d => d.id === id);
-            document.getElementById('m-carrier-id').innerText = id;
-            document.getElementById('m-body').innerHTML = logs.map(l => `
-                <tr class="hover:bg-white/5 transition-all">
-                    <td class="py-5 font-black text-white italic">${l.st}</td>
-                    <td class="py-5 font-black text-blue-400 italic">${l.ts}</td>
-                    <td class="py-5">
-                        <span class="font-black ${l.res ? 'text-emerald-500' : 'text-red-500'}">${l.res ? 'OK' : 'NG'}</span>
-                    </td>
-                    <td class="py-5 font-bold text-slate-400 uppercase text-[11px]">${l.msg}</td>
-                    <td class="py-5 text-right font-mono text-slate-500 text-xs">${l.time}</td>
-                </tr>
-            `).join('');
-            document.getElementById('detail-modal').classList.remove('hidden');
+        // ฟังก์ชันแก้ไข updateUI (ปรับปรุงส่วน grid)
+        function updateUI() {
+            // ... (โค้ดเดิมของคุณ) ...
+            // ส่วนที่ต้องแก้ไขใน loop ของ station-grid:
+            document.getElementById('station-grid').innerHTML = Object.keys(stationStats).map(s => {
+                const d = stationStats[s];
+                return `
+                    <div class="glass p-5 rounded-2xl border-t-4 ${d.fail > 0 ? 'border-red-500' : 'border-blue-500'}">
+                        <h3 class="text-sm font-black text-white">${s}</h3>
+                        <div class="grid grid-cols-2 gap-2 mt-4">
+                            <div class="bg-emerald-600 p-2 rounded-xl cursor-pointer hover:bg-emerald-500" onclick="showStationData('${s}', 'PASS')">
+                                <p class="text-center font-black">${d.pass}</p>
+                            </div>
+                            <div class="${d.fail > 0 ? 'bg-red-600' : 'bg-slate-700'} p-2 rounded-xl cursor-pointer hover:bg-red-500" onclick="showStationData('${s}', 'FAIL')">
+                                <p class="text-center font-black">${d.fail}</p>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
         }
 
-        function closeModal() { document.getElementById('detail-modal').classList.add('hidden'); }
-        
-        window.onload = updateTable;
-        window.onresize = () => pie.resize();
+        // โค้ดเดิมที่เหลือ...
+        // (เชื่อมต่อ function processFile เข้ากับ drop-zone เหมือนเดิม)
     </script>
 </body>
 </html>
