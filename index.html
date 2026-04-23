@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Station Analytics Pro - Updated</title>
+    <title>Station Analytics Pro - Full Version</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
@@ -18,20 +18,25 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <div id="popover-overlay" onclick="hideErrorPopover()">
-        <div class="glass max-w-md w-full p-8 rounded-3xl border-t-2 border-red-500" onclick="event.stopPropagation()">
-            <div id="popover-content" class="text-sm font-bold text-white"></div>
-        </div>
-    </div>
-
     <div id="fail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div class="glass w-full max-w-3xl max-h-[80vh] rounded-3xl overflow-hidden flex flex-col">
             <div class="p-6 border-b border-white/10 flex justify-between items-center bg-blue-500/10">
-                <h2 id="modal-carrier-id" class="text-xl font-black text-white italic">Details</h2>
-                <button onclick="closeModal()" class="text-white text-2xl">&times;</button>
+                <div>
+                    <h2 id="modal-carrier-id" class="text-xl font-black text-white italic">Details</h2>
+                </div>
+                <button onclick="closeModal()" class="text-white text-2xl hover:text-red-500">&times;</button>
             </div>
             <div class="p-6 overflow-auto">
                 <table class="w-full text-left text-xs font-mono">
+                    <thead class="text-[10px] text-slate-500 uppercase font-black">
+                        <tr>
+                            <th class="pb-3">ID/Carrier</th>
+                            <th class="pb-3">Tester</th>
+                            <th class="pb-3">Seq</th>
+                            <th class="pb-3">Title/Error</th>
+                            <th class="pb-3 text-right">Time</th>
+                        </tr>
+                    </thead>
                     <tbody id="modal-table-body" class="text-slate-300"></tbody>
                 </table>
             </div>
@@ -39,13 +44,24 @@
     </div>
 
     <div class="max-w-6xl mx-auto">
-        <h1 class="text-3xl font-black text-white mb-6 uppercase">Station<span class="text-blue-500">Live</span></h1>
-        
-        <div class="flex gap-4 mb-6">
-            <div id="drop-zone" class="flex-1 h-16 border-2 border-dashed border-slate-700 rounded-2xl flex items-center justify-center cursor-pointer hover:border-blue-500">
-                <span id="drop-text" class="text-slate-400 font-bold">Drop Log File Here</span>
+        <div class="glass p-6 rounded-3xl mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <h1 class="text-3xl font-black text-white uppercase">Station<span class="text-blue-500">Live</span></h1>
+            <div id="drop-zone" class="w-full md:w-80 h-16 border-2 border-dashed border-slate-700 rounded-2xl flex items-center justify-center cursor-pointer hover:border-blue-500">
+                <span id="drop-text" class="text-slate-400 font-bold uppercase text-xs">Drop Log File Here</span>
                 <input type="file" id="file-input" class="hidden" accept=".csv,.txt">
             </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <select id="line-filter" onchange="updateUI()" class="bg-slate-900 p-3 rounded-xl border border-slate-700 text-sm font-black text-white">
+                <option value="ALL">All Lines</option>
+            </select>
+            <select id="station-filter" onchange="updateUI()" class="bg-slate-900 p-3 rounded-xl border border-slate-700 text-sm font-black text-white">
+                <option value="ALL">All Stations</option>
+            </select>
+            <select id="time-type" onchange="updateUI()" class="bg-slate-900 p-3 rounded-xl border border-slate-700 text-sm font-black text-white">
+                <option value="ALL">All Time</option>
+            </select>
         </div>
 
         <div id="station-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
@@ -53,49 +69,89 @@
 
     <script>
         let rawData = [];
-        let pieChart = echarts.init(document.createElement('div')); // Placeholder
 
-        // ฟังก์ชันใหม่: สำหรับกดดูรายละเอียดจาก Station Grid
+        // 1. จัดการไฟล์
+        document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
+        document.getElementById('file-input').onchange = (e) => processFile(e.target.files[0]);
+
+        // 2. ฟังก์ชัน Modal (แสดงรายละเอียด)
         function showStationData(station, status) {
+            const lineFilter = document.getElementById('line-filter').value;
             const filteredData = rawData.filter(d => 
-                d.station === station && (status === 'PASS' ? d.result : !d.result)
+                d.station === station && 
+                (status === 'PASS' ? d.result : !d.result) &&
+                (lineFilter === 'ALL' || d.line === lineFilter)
             );
 
-            document.getElementById('modal-carrier-id').innerText = `${station} - ${status}`;
+            document.getElementById('modal-carrier-id').innerText = `${station} (${status})`;
             document.getElementById('modal-table-body').innerHTML = filteredData.length ? filteredData.map(d => `
                 <tr class="border-b border-white/5">
-                    <td class="py-3 text-blue-400 font-bold">${d.carrier}</td>
-                    <td class="py-3 text-emerald-400 font-bold">${d.tester}</td>
-                    <td class="py-3">${d.seq}</td>
-                    <td class="py-3 text-white">${d.title}</td>
-                </tr>`).join('') : '<tr><td class="p-8 text-center">No Data</td></tr>';
+                    <td class="py-3 text-blue-400 font-bold">${d.carrier || '-'}</td>
+                    <td class="py-3 text-emerald-400 font-bold">${d.tester || '-'}</td>
+                    <td class="py-3">${d.seq || '-'}</td>
+                    <td class="py-3 text-white truncate max-w-[200px]">${d.title || '-'}</td>
+                    <td class="py-3 text-right text-slate-500 text-[10px]">${d.time || '-'}</td>
+                </tr>`).join('') : '<tr><td colspan="5" class="p-8 text-center text-slate-600">No data</td></tr>';
             
             document.getElementById('fail-modal').classList.remove('hidden');
         }
 
-        // ฟังก์ชันแก้ไข updateUI (ปรับปรุงส่วน grid)
+        function closeModal() { document.getElementById('fail-modal').classList.add('hidden'); }
+
+        // 3. ประมวลผลข้อมูล
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const lines = e.target.result.trim().split(/\r?\n/);
+                const headers = lines[0].split(lines[0].includes('\t') ? '\t' : ',').map(h => h.trim().toUpperCase());
+                
+                rawData = lines.slice(1).map(line => {
+                    const cols = line.split(lines[0].includes('\t') ? '\t' : ',');
+                    return {
+                        line: cols[headers.indexOf('LINE')] || 'Line 1',
+                        station: cols[headers.indexOf('STATION')] || 'Station',
+                        result: ['PASS', 'OK', '1', 'TRUE'].includes((cols[headers.indexOf('RESULT')] || '').toUpperCase()),
+                        carrier: cols[headers.indexOf('CARRIER')] || 'N/A',
+                        tester: cols[headers.indexOf('TESTER')] || 'N/A',
+                        seq: cols[headers.indexOf('SEQ')] || '0',
+                        title: cols[headers.indexOf('TITLE')] || 'No Data',
+                        time: cols[headers.indexOf('TIME')] || '-'
+                    };
+                });
+                updateUI();
+            };
+            reader.readAsText(file);
+        }
+
+        // 4. อัปเดตหน้าจอ
         function updateUI() {
-            // ... (โค้ดเดิมของคุณ) ...
-            // ส่วนที่ต้องแก้ไขใน loop ของ station-grid:
+            const lineFilter = document.getElementById('line-filter').value;
+            let stationStats = {};
+
+            rawData.forEach(d => {
+                if(lineFilter !== 'ALL' && d.line !== lineFilter) return;
+                if(!stationStats[d.station]) stationStats[d.station] = { pass: 0, fail: 0 };
+                d.result ? stationStats[d.station].pass++ : stationStats[d.station].fail++;
+            });
+
             document.getElementById('station-grid').innerHTML = Object.keys(stationStats).map(s => {
                 const d = stationStats[s];
                 return `
                     <div class="glass p-5 rounded-2xl border-t-4 ${d.fail > 0 ? 'border-red-500' : 'border-blue-500'}">
                         <h3 class="text-sm font-black text-white">${s}</h3>
                         <div class="grid grid-cols-2 gap-2 mt-4">
-                            <div class="bg-emerald-600 p-2 rounded-xl cursor-pointer hover:bg-emerald-500" onclick="showStationData('${s}', 'PASS')">
+                            <div class="bg-emerald-600 p-2 rounded-xl cursor-pointer hover:bg-emerald-500 transition-all" onclick="showStationData('${s}', 'PASS')">
                                 <p class="text-center font-black">${d.pass}</p>
+                                <p class="text-[8px] text-emerald-200 uppercase">Pass</p>
                             </div>
-                            <div class="${d.fail > 0 ? 'bg-red-600' : 'bg-slate-700'} p-2 rounded-xl cursor-pointer hover:bg-red-500" onclick="showStationData('${s}', 'FAIL')">
+                            <div class="${d.fail > 0 ? 'bg-red-600' : 'bg-slate-700'} p-2 rounded-xl cursor-pointer hover:bg-red-500 transition-all" onclick="showStationData('${s}', 'FAIL')">
                                 <p class="text-center font-black">${d.fail}</p>
+                                <p class="text-[8px] text-red-200 uppercase">Fail</p>
                             </div>
                         </div>
                     </div>`;
             }).join('');
         }
-
-        // โค้ดเดิมที่เหลือ...
-        // (เชื่อมต่อ function processFile เข้ากับ drop-zone เหมือนเดิม)
     </script>
 </body>
 </html>
