@@ -38,7 +38,6 @@
         </div>
     </div>
 
-    <!-- Carrier Fail Modal -->
     <div id="fail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div class="glass w-full max-w-3xl max-h-[80vh] rounded-3xl overflow-hidden flex flex-col">
             <div class="p-6 border-b border-white/10 flex justify-between items-center bg-red-500/10">
@@ -65,7 +64,6 @@
         </div>
     </div>
 
-    <!-- Station Detail Modal -->
     <div id="station-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div class="glass w-full max-w-4xl max-h-[85vh] rounded-3xl overflow-hidden flex flex-col">
             <div id="station-modal-header" class="p-6 border-b border-white/10 flex justify-between items-center">
@@ -167,7 +165,6 @@
                             </select>
                         </div>
                     </div>
-
                     <div class="glass p-6 rounded-2xl border-t border-red-500/30">
                         <h3 class="text-[10px] uppercase font-black text-red-500 mb-4 tracking-widest">Top 5 Fail Reasons (Pareto)</h3>
                         <div id="pareto-list" class="space-y-3">
@@ -175,18 +172,22 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="glass p-4 rounded-2xl lg:col-span-2 relative min-h-[300px]">
                     <div id="pie-chart" style="width: 100%; height: 300px;"></div>
                 </div>
             </div>
-
             <div id="station-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pb-10"></div>
         </div>
 
         <div id="view-carrier" class="hidden glass rounded-2xl overflow-hidden">
             <div class="p-4 bg-blue-500/10 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-                <span class="text-blue-400 font-black text-sm uppercase tracking-widest">Carrier Performance Rank</span>
+                <div class="flex items-center gap-3">
+                    <span class="text-blue-400 font-black text-[10px] uppercase tracking-widest">Sort:</span>
+                    <div class="flex bg-slate-900 p-1 rounded-xl border border-white/10">
+                        <button onclick="setSortMode('fail')" id="btn-sort-fail" class="px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all bg-red-500 text-white shadow-lg shadow-red-500/20">Fail</button>
+                        <button onclick="setSortMode('pass')" id="btn-sort-pass" class="px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all text-slate-400 hover:text-white">Pass</button>
+                    </div>
+                </div>
                 <input type="text" id="carrier-search" oninput="updateUI()" placeholder="SEARCH CARRIER ID..." class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs font-black outline-none w-full md:w-64 focus:border-blue-500 transition-all">
             </div>
             <div class="max-h-[600px] overflow-auto">
@@ -212,10 +213,27 @@
         let carrierFailDetails = {};
         let stationRowCache = {};
         let currentStationModalRows = [];
+        let currentSortMode = 'fail'; // [ADD] Default sort mode
         let pieChart = echarts.init(document.getElementById('pie-chart'), 'dark');
 
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = (e) => processFile(e.target.files[0]);
+
+        // [ADD] Function to handle sorting mode
+        function setSortMode(mode) {
+            currentSortMode = mode;
+            const btnFail = document.getElementById('btn-sort-fail');
+            const btnPass = document.getElementById('btn-sort-pass');
+            
+            if (mode === 'fail') {
+                btnFail.className = "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all bg-red-500 text-white shadow-lg shadow-red-500/20";
+                btnPass.className = "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all text-slate-400 hover:text-white";
+            } else {
+                btnFail.className = "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all text-slate-400 hover:text-white";
+                btnPass.className = "px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all bg-emerald-500 text-white shadow-lg shadow-emerald-500/20";
+            }
+            updateUI();
+        }
 
         function switchTab(tab) {
             document.getElementById('view-overview').classList.toggle('hidden', tab !== 'overview');
@@ -354,7 +372,6 @@
 
                 if (!carrierStats[d.carrier]) carrierStats[d.carrier] = { pass: 0, fail: 0 };
 
-                // Build station row cache for drill-down
                 if (!stationRowCache[d.station]) stationRowCache[d.station] = { pass: [], fail: [] };
                 if (d.result) stationRowCache[d.station].pass.push(d);
                 else stationRowCache[d.station].fail.push(d);
@@ -410,35 +427,30 @@
                                 <span class="text-xl font-black text-white font-mono">${(d.pass + d.fail).toLocaleString()}</span>
                             </div>
                             <div class="grid grid-cols-2 gap-2 text-center font-black">
-                                <button 
-                                    onclick="showStationDetail('${s.replace(/'/g,"\\'")}', 'pass')"
-                                    class="stat-btn bg-emerald-600 hover:bg-emerald-500 p-2 rounded-xl flex flex-col items-center ${!hasPass ? 'opacity-40 cursor-default' : ''}"
-                                    ${!hasPass ? 'disabled' : ''}>
+                                <button onclick="showStationDetail('${s.replace(/'/g,"\\'")}', 'pass')" class="stat-btn bg-emerald-600 hover:bg-emerald-500 p-2 rounded-xl flex flex-col items-center ${!hasPass ? 'opacity-40 cursor-default' : ''}" ${!hasPass ? 'disabled' : ''}>
                                     <p class="text-lg text-white font-mono">${d.pass.toLocaleString()}</p>
                                     <p class="text-[9px] text-emerald-200 uppercase tracking-widest font-black">Pass ▶</p>
                                 </button>
-                                <button 
-                                    onclick="showStationDetail('${s.replace(/'/g,"\\'")}', 'fail')"
-                                    class="stat-btn ${hasFail ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 opacity-40 cursor-default'} p-2 rounded-xl flex flex-col items-center"
-                                    ${!hasFail ? 'disabled' : ''}>
+                                <button onclick="showStationDetail('${s.replace(/'/g,"\\'")}', 'fail')" class="stat-btn ${hasFail ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-700 opacity-40 cursor-default'} p-2 rounded-xl flex flex-col items-center" ${!hasFail ? 'disabled' : ''}>
                                     <p class="text-lg text-white font-mono">${d.fail.toLocaleString()}</p>
                                     <p class="text-[9px] ${hasFail ? 'text-red-200' : 'text-slate-400'} uppercase tracking-widest font-black">${hasFail ? 'Fail ▶' : 'Fail'}</p>
                                 </button>
-                            </div>
-                            <div class="mt-1">
-                                <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                                    <div class="h-1.5 rounded-full bg-emerald-500" style="width: ${((d.pass / (d.pass + d.fail || 1)) * 100).toFixed(1)}%"></div>
-                                </div>
-                                <div class="flex justify-between mt-1">
-                                    <span class="text-[9px] text-emerald-500 font-black">${((d.pass / (d.pass + d.fail || 1)) * 100).toFixed(1)}%</span>
-                                    <span class="text-[9px] text-slate-500 font-black uppercase tracking-widest">yield</span>
-                                </div>
                             </div>
                         </div>
                     </div>`;
             }).join('');
 
-            const sortedCarriers = Object.entries(carrierStats).filter(([id]) => id.toUpperCase().includes(searchTerm)).sort((a, b) => b[1].fail - a[1].fail);
+            // [MODIFIED] Sorting logic based on selected mode
+            const sortedCarriers = Object.entries(carrierStats)
+                .filter(([id]) => id.toUpperCase().includes(searchTerm))
+                .sort((a, b) => {
+                    if (currentSortMode === 'fail') {
+                        return (b[1].fail - a[1].fail) || (b[1].pass - a[1].pass);
+                    } else {
+                        return (b[1].pass - a[1].pass) || (b[1].fail - a[1].fail);
+                    }
+                });
+
             document.getElementById('carrier-table-body').innerHTML = sortedCarriers.map(([id, stat]) => {
                 const cTotal = stat.pass + stat.fail;
                 const cYield = ((stat.pass / (cTotal || 1)) * 100).toFixed(1);
@@ -451,19 +463,14 @@
             if (!cache) return;
             const rows = type === 'pass' ? cache.pass : cache.fail;
             currentStationModalRows = rows;
-
             const isPass = type === 'pass';
             const header = document.getElementById('station-modal-header');
             header.className = `p-6 border-b border-white/10 flex justify-between items-center ${isPass ? 'bg-emerald-500/10' : 'bg-red-500/10'}`;
-
             document.getElementById('station-modal-title').innerText = stationName;
             document.getElementById('station-modal-subtitle').innerText = isPass ? 'Pass Record Log' : 'Failure Record Log';
-            document.getElementById('station-modal-subtitle').className = `text-[10px] font-black uppercase tracking-widest mt-1 ${isPass ? 'text-emerald-400' : 'text-red-400'}`;
-
             const badge = document.getElementById('station-modal-badge');
             badge.innerText = isPass ? `${rows.length.toLocaleString()} PASS` : `${rows.length.toLocaleString()} FAIL`;
             badge.className = `px-3 py-1 rounded-full text-xs font-black uppercase ${isPass ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-red-500/20 text-red-400 border border-red-500/40'}`;
-
             document.getElementById('station-modal-search').value = '';
             renderStationModalTable(rows, isPass);
             document.getElementById('station-modal').classList.remove('hidden');
@@ -478,43 +485,41 @@
                     <td class="p-4 text-slate-400">${d.seq}</td>
                     <td class="p-4 text-white max-w-[200px] truncate ${!isPass ? 'text-red-300' : ''}" title="${d.title}">${d.title}</td>
                     <td class="p-4 text-right text-slate-500 text-[10px]">${d.time}</td>
-                </tr>`).join('') : `<tr><td colspan="5" class="p-8 text-center text-slate-600 uppercase text-[10px]">No records</td></tr>`;
+                </tr>`).join('') : '<tr><td colspan="5" class="p-10 text-center text-slate-500 italic">No data found</td></tr>';
         }
 
         function filterStationModalTable() {
-            const q = document.getElementById('station-modal-search').value.toUpperCase();
-            const filtered = q ? currentStationModalRows.filter(d =>
-                d.carrier.toUpperCase().includes(q) ||
-                d.tester.toUpperCase().includes(q) ||
-                d.title.toUpperCase().includes(q) ||
-                d.seq.toString().includes(q)
-            ) : currentStationModalRows;
-            // detect isPass by checking header color class
-            const isPass = document.getElementById('station-modal-header').classList.contains('bg-emerald-500/10');
+            const term = document.getElementById('station-modal-search').value.toUpperCase();
+            const isPass = document.getElementById('station-modal-subtitle').innerText.includes('Pass');
+            const filtered = currentStationModalRows.filter(r => 
+                r.carrier.toUpperCase().includes(term) || r.tester.toUpperCase().includes(term) || r.title.toUpperCase().includes(term)
+            );
             renderStationModalTable(filtered, isPass);
         }
 
-        function closeStationModal() { document.getElementById('station-modal').classList.add('hidden'); }
-
-        function showErrorPopover(message) { document.getElementById('popover-content').innerText = message; document.getElementById('popover-overlay').classList.add('active'); }
-        function hideErrorPopover() { document.getElementById('popover-overlay').classList.remove('active'); }
-
-        function showFailDetails(id) {
-            const details = carrierFailDetails[id] || [];
-            document.getElementById('modal-carrier-id').innerText = id;
+        function showFailDetails(carrierId) {
+            const details = carrierFailDetails[carrierId] || [];
+            document.getElementById('modal-carrier-id').innerText = carrierId;
             document.getElementById('modal-table-body').innerHTML = details.length ? details.map(d => `
                 <tr class="border-b border-white/5">
-                    <td class="py-3 text-blue-400 font-bold">${d.station}</td>
-                    <td class="py-3 text-emerald-400 font-bold">${d.tester}</td>
+                    <td class="py-3 text-blue-400">${d.station}</td>
+                    <td class="py-3 text-purple-400">${d.tester}</td>
                     <td class="py-3">${d.seq}</td>
-                    <td class="py-3 text-white max-w-[200px] truncate" title="${d.title}">${d.title}</td>
-                    <td class="py-3 text-right text-slate-500 text-[10px]">${d.time}</td>
-                </tr>`).join('') : '<tr><td colspan="5" class="p-8 text-center text-slate-600 uppercase text-[10px]">No fail data</td></tr>';
+                    <td class="py-3 text-red-400 font-bold">${d.title}</td>
+                    <td class="py-3 text-right text-slate-500">${d.time}</td>
+                </tr>`).join('') : '<tr><td colspan="5" class="py-10 text-center text-slate-500">No failure logs</td></tr>';
             document.getElementById('fail-modal').classList.remove('hidden');
         }
 
         function closeModal() { document.getElementById('fail-modal').classList.add('hidden'); }
-        window.onresize = () => pieChart.resize();
+        function closeStationModal() { document.getElementById('station-modal').classList.add('hidden'); }
+        function showErrorPopover(msg) {
+            document.getElementById('popover-content').innerText = msg;
+            document.getElementById('popover-overlay').classList.add('active');
+        }
+        function hideErrorPopover() { document.getElementById('popover-overlay').classList.remove('active'); }
+        window.addEventListener('resize', () => pieChart.resize());
+        updateUI();
     </script>
 </body>
 </html>
