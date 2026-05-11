@@ -95,14 +95,20 @@ tr.low{background:rgba(239,68,68,.035)}tr:hover{background:rgba(255,255,255,.025
 .viewer .today-meta .mini,
 .viewer .csv-row-btns { display:none!important }
 .viewer .layout{grid-template-columns:1fr}
-/* ป้องกัน JS แก้ไขผ่าน pointer — ล็อคเฉพาะปุ่มที่แก้ไขข้อมูล */
-.viewer input,.viewer button,.viewer select,.viewer textarea{pointer-events:none!important;user-select:none!important}
-/* อนุญาตให้กด: ค้นหา, sheet tabs, stats cards, sort headers */
+/* ป้องกันแก้ไข: ล็อค input/select/textarea */
+.viewer input,.viewer select,.viewer textarea{pointer-events:none!important;user-select:none!important}
+/* ล็อคปุ่มทั้งหมดก่อน */
+.viewer button{pointer-events:none!important;cursor:default!important}
+/* อนุญาต: ค้นหา */
 .viewer .search input{pointer-events:auto!important;user-select:auto!important}
-.viewer .sheetbar .sheet{pointer-events:auto!important;cursor:pointer!important}
-.viewer .stats .card button{pointer-events:auto!important;cursor:pointer!important}
-.viewer thead th{pointer-events:auto!important;cursor:pointer!important}
-.viewer #todayModal button,.viewer .modal button{pointer-events:auto!important}
+/* อนุญาต: sheet tabs - ใช้ specificity สูง */
+body.viewer .sheetbar button{pointer-events:auto!important;cursor:pointer!important}
+/* อนุญาต: stats */
+body.viewer .stats button{pointer-events:auto!important;cursor:pointer!important}
+/* อนุญาต: sort headers */
+body.viewer thead th{pointer-events:auto!important;cursor:pointer!important}
+/* อนุญาต: ปิด modal */
+body.viewer .modalbg button{pointer-events:auto!important;cursor:pointer!important}
 /* EDIT mode */
 .editmode .edit-note{display:block}
 
