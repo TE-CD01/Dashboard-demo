@@ -853,22 +853,21 @@ async function pullLatestFromSupabase(){
     const {data,error}=await onlineClient.from(SHARE_TABLE)
       .select('payload,updated_at').eq('id',onlineConfig.id).single();
     if(error||!data?.payload?.items?.length)return;
-    // เช็ค updated_at ว่าใหม่กว่าที่เราส่งไปล่าสุดไหม
     const remoteTime=new Date(data.updated_at).getTime();
-    if(remoteTime<=lastPushTime)return; // เราเป็นคนอัปเดตล่าสุดอยู่แล้ว
-    // มีคนอื่น (edit-link) อัปเดต — ดึงมาใช้
+    if(remoteTime<=lastPushTime)return; // เราเป็นคนอัปเดตล่าสุด ไม่ต้อง pull
+    // คนอื่น (edit-link) อัปเดตล่าสุด — sync qty มาใช้
     const remoteItems=data.payload.items||[];
     const remoteHistory=data.payload.history||[];
-    // อัปเดตเฉพาะ qty ของ item ที่มีอยู่แล้ว
     remoteItems.forEach(ri=>{
       const local=inv.find(x=>x.id===ri.id);
       if(local)local.qty=ri.qty;
     });
-    // merge history (เพิ่มรายการที่ไม่มีใน local)
+    // merge history ที่ยังไม่มีใน local
     const localIds=new Set(history.map(h=>h.id));
     remoteHistory.forEach(rh=>{if(rh.id&&!localIds.has(rh.id))history.unshift(rh)});
-    history.sort((a,b)=>b.ts?.localeCompare?.(a.ts||'')||0);
+    lastPushTime=remoteTime; // อัปเดต timestamp ให้ตรง
     refreshAll();
+    toast('good','🔄 ข้อมูลอัปเดตจากลิงค์แก้ไข');
   }catch(e){}
 }
 let lastPushTime=0;
@@ -877,18 +876,19 @@ function scheduleOnlineSync(){
   if(!onlineOn||viewerMode)return;
   clearTimeout(onlineSyncTimer);
   onlineSyncTimer=setTimeout(async()=>{
-    lastPushTime=Date.now();
-    await pushOnlineSnapshot().catch(e=>toast('warn','Sync ไม่สำเร็จ: '+e.message));
+    try{
+      await pushOnlineSnapshot();
+      lastPushTime=Date.now();
+    }catch(e){toast('warn','Sync ไม่สำเร็จ: '+e.message)}
   },700);
 }
 function startHeartbeat(){
   clearInterval(heartbeatTimer);
+  // poll ทุก 5 วิ: pull ก่อน ถ้าไม่มีของใหม่จากคนอื่น ค่อย push heartbeat
   heartbeatTimer=setInterval(async()=>{
-    // สลับกัน: push ทุก 30 วิ, pull ทุก 5 วิ
     await pullLatestFromSupabase();
-    lastPushTime=Date.now();
-    await pushOnlineSnapshot().catch(()=>{});
-  },5000); // poll ทุก 5 วิ เพื่อรับการเปลี่ยนแปลงจาก edit-link
+    try{await pushOnlineSnapshot();lastPushTime=Date.now();}catch(e){}
+  },5000);
 }
 async function disconnectOnline(){
   try{
