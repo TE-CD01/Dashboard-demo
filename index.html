@@ -840,13 +840,13 @@ async function connectOnline(urlArg,keyArg,idArg){
 }
 async function pushOnlineSnapshot(){
   if(!onlineClient||!onlineConfig)return;
+  const now=new Date().toISOString();
   const {error}=await onlineClient.from(SHARE_TABLE).upsert({
-    id:onlineConfig.id,active:true,payload:onlinePayload(),updated_at:new Date().toISOString()
+    id:onlineConfig.id,active:true,payload:onlinePayload(),updated_at:now
   });
   if(error)throw error;
+  lastOwnPushTime=Date.now();
 }
-// ดึงข้อมูลล่าสุดจาก Supabase มาอัปเดต memory ของเจ้าของ
-// (กรณีคนอื่นใช้ลิงค์ edit แล้วทำรายการ)
 async function pullLatestFromSupabase(){
   if(!onlineClient||!onlineConfig||viewerMode)return;
   try{
@@ -854,40 +854,38 @@ async function pullLatestFromSupabase(){
       .select('payload,updated_at').eq('id',onlineConfig.id).single();
     if(error||!data?.payload?.items?.length)return;
     const remoteTime=new Date(data.updated_at).getTime();
-    if(remoteTime<=lastPushTime)return; // เราเป็นคนอัปเดตล่าสุด ไม่ต้อง pull
-    // คนอื่น (edit-link) อัปเดตล่าสุด — sync qty มาใช้
+    // ถ้า remote ใหม่กว่าที่เราเพิ่ง push ไป = คนอื่น (edit-link) เป็นคนอัปเดต
+    if(remoteTime<=lastOwnPushTime)return;
     const remoteItems=data.payload.items||[];
     const remoteHistory=data.payload.history||[];
+    // อัปเดต qty
     remoteItems.forEach(ri=>{
       const local=inv.find(x=>x.id===ri.id);
-      if(local)local.qty=ri.qty;
+      if(local&&local.qty!==ri.qty)local.qty=ri.qty;
     });
-    // merge history ที่ยังไม่มีใน local
+    // merge history
     const localIds=new Set(history.map(h=>h.id));
     remoteHistory.forEach(rh=>{if(rh.id&&!localIds.has(rh.id))history.unshift(rh)});
-    lastPushTime=remoteTime; // อัปเดต timestamp ให้ตรง
     refreshAll();
     toast('good','🔄 ข้อมูลอัปเดตจากลิงค์แก้ไข');
   }catch(e){}
 }
-let lastPushTime=0;
+let lastOwnPushTime=0;
 let onlineSyncTimer=null;
 function scheduleOnlineSync(){
   if(!onlineOn||viewerMode)return;
   clearTimeout(onlineSyncTimer);
   onlineSyncTimer=setTimeout(async()=>{
-    try{
-      await pushOnlineSnapshot();
-      lastPushTime=Date.now();
-    }catch(e){toast('warn','Sync ไม่สำเร็จ: '+e.message)}
+    try{await pushOnlineSnapshot();}
+    catch(e){toast('warn','Sync ไม่สำเร็จ: '+e.message)}
   },700);
 }
 function startHeartbeat(){
   clearInterval(heartbeatTimer);
-  // poll ทุก 5 วิ: pull ก่อน ถ้าไม่มีของใหม่จากคนอื่น ค่อย push heartbeat
   heartbeatTimer=setInterval(async()=>{
+    // pull ก่อน — ถ้ามีคนอื่นทำรายการ จะดึงมาก่อน แล้วค่อย push รวม
     await pullLatestFromSupabase();
-    try{await pushOnlineSnapshot();lastPushTime=Date.now();}catch(e){}
+    try{await pushOnlineSnapshot();}catch(e){}
   },5000);
 }
 async function disconnectOnline(){
