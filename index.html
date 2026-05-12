@@ -707,21 +707,23 @@ async function uploadImg(id,input){
   const it=inv.find(x=>x.id===id);if(!it)return;
   toast('warn','กำลังอัปโหลดรูป...');
   try{
-    // compress รูปก่อน upload
-    const compressed=await compressImg(file,600);
-    const blob=await fetch(compressed).then(r=>r.blob());
+    const sb=onlineClient||await makeSupabase(DEFAULT_SUPABASE_URL,DEFAULT_SUPABASE_ANON_KEY);
     const ext=file.name.split('.').pop()||'jpg';
     const path=`items/${id.replace(/[^a-z0-9]/gi,'-')}.${ext}`;
-    // ต้องมี supabase client — ถ้ายังไม่มีให้สร้างจาก config
-    const sb=onlineClient||await makeSupabase(DEFAULT_SUPABASE_URL,DEFAULT_SUPABASE_ANON_KEY);
-    // upload (upsert)
-    const {error}=await sb.storage.from('stock-images').upload(path,blob,{upsert:true,contentType:blob.type});
+    // ลบรูปเก่าก่อน (ถ้ามี)
+    if(it.img){
+      const oldPath=it.img.split('/stock-images/')[1];
+      if(oldPath)await sb.storage.from('stock-images').remove([oldPath]);
+    }
+    // compress แล้ว upload ใหม่
+    const compressed=await compressImg(file,600);
+    const blob=await fetch(compressed).then(r=>r.blob());
+    const {error}=await sb.storage.from('stock-images').upload(path,blob,{contentType:blob.type});
     if(error)throw error;
-    // get public URL
     const {data}=sb.storage.from('stock-images').getPublicUrl(path);
     it.img=data.publicUrl;
     markDirty(it);renderTable();scheduleOnlineSync();
-    toast('good','อัปโหลดรูปสำเร็จ ทุกคนจะเห็นรูปนี้');
+    toast('good','เปลี่ยนรูปสำเร็จ รูปเก่าถูกลบแล้ว');
   }catch(e){toast('bad','อัปโหลดไม่สำเร็จ: '+e.message)}
 }
 function compressImg(file,maxSize=600){
