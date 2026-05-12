@@ -636,7 +636,8 @@ function renderTable(){
       <button class="pcard-btn" onclick="setMin('${esc(it.id)}')" title="ตั้ง Min">⚙️</button>`;
     return`<div class="pcard ${zero?'zero-stock':low?'low-stock':''}">
       <div class="pcard-img">
-        ${it.img?`<img src="${esc(it.img)}" alt="">`:'<span class="no-img">📦</span>'}
+        ${it.img?`<img src="${esc(it.img)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`:''}
+        <span class="no-img" style="${it.img?'display:none':''}">📦</span>
         <span class="pcard-badge ${badge}">${badgeText}</span>
         ${!viewerMode?`<label style="position:absolute;bottom:6px;right:6px;cursor:pointer;background:rgba(255,255,255,.9);border-radius:6px;padding:3px 6px;font-size:10px;font-weight:700;color:var(--blue);border:1px solid var(--line)">📷<input type="file" accept="image/*" style="display:none" onchange="uploadImg('${esc(it.id)}',this)"></label>`:''}
       </div>
@@ -1033,7 +1034,7 @@ function onlinePayload(){
   return {
     title:'StockManager',updated_at:new Date().toISOString(),heartbeat_at:new Date().toISOString(),
     stats:{total:inv.length,low:inv.filter(isLow).length},
-    items:inv.map(x=>({id:x.id,name:x.name,qty:x.qty,min:x.min,unit:x.unit,sheet:x.sheet,remark:x.remark})),
+    items:inv.map(x=>({id:x.id,name:x.name,qty:x.qty,min:x.min,unit:x.unit,sheet:x.sheet,remark:x.remark,img:x.img||null})),
     history:history.slice(0,120)
   };
 }
