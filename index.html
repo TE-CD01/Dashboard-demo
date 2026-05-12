@@ -712,15 +712,15 @@ async function uploadImg(id,input){
     const path=`items/${id.replace(/[^a-z0-9]/gi,'-')}.${ext}`;
     // ลบรูปเก่าก่อน (ถ้ามี)
     if(it.img){
-      const oldPath=it.img.split('/stock-images/')[1];
-      if(oldPath)await sb.storage.from('stock-images').remove([oldPath]);
+      const oldPath=it.img.split('/pictures/')[1];
+      if(oldPath)await sb.storage.from('pictures').remove([oldPath]);
     }
     // compress แล้ว upload ใหม่
     const compressed=await compressImg(file,600);
     const blob=await fetch(compressed).then(r=>r.blob());
-    const {error}=await sb.storage.from('stock-images').upload(path,blob,{contentType:blob.type});
+    const {error}=await sb.storage.from('pictures').upload(path,blob,{contentType:blob.type});
     if(error)throw error;
-    const {data}=sb.storage.from('stock-images').getPublicUrl(path);
+    const {data}=sb.storage.from('pictures').getPublicUrl(path);
     it.img=data.publicUrl;
     markDirty(it);renderTable();scheduleOnlineSync();
     toast('good','เปลี่ยนรูปสำเร็จ รูปเก่าถูกลบแล้ว');
