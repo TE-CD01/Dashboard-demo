@@ -701,18 +701,44 @@ function renderTable(){
     </div>`;
   }).join('');
 }
-function uploadImg(id,input){
+async function uploadImg(id,input){
   const file=input.files?.[0];input.value='';
   if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const it=inv.find(x=>x.id===id);
-    if(!it)return;
-    it.img=e.target.result;
+  const it=inv.find(x=>x.id===id);if(!it)return;
+  toast('warn','กำลังอัปโหลดรูป...');
+  try{
+    // compress รูปก่อน upload
+    const compressed=await compressImg(file,600);
+    const blob=await fetch(compressed).then(r=>r.blob());
+    const ext=file.name.split('.').pop()||'jpg';
+    const path=`items/${id.replace(/[^a-z0-9]/gi,'-')}.${ext}`;
+    // ต้องมี supabase client — ถ้ายังไม่มีให้สร้างจาก config
+    const sb=onlineClient||await makeSupabase(DEFAULT_SUPABASE_URL,DEFAULT_SUPABASE_ANON_KEY);
+    // upload (upsert)
+    const {error}=await sb.storage.from('stock-images').upload(path,blob,{upsert:true,contentType:blob.type});
+    if(error)throw error;
+    // get public URL
+    const {data}=sb.storage.from('stock-images').getPublicUrl(path);
+    it.img=data.publicUrl;
     markDirty(it);renderTable();scheduleOnlineSync();
-    toast('good','บันทึกรูปแล้ว');
-  };
-  reader.readAsDataURL(file);
+    toast('good','อัปโหลดรูปสำเร็จ ทุกคนจะเห็นรูปนี้');
+  }catch(e){toast('bad','อัปโหลดไม่สำเร็จ: '+e.message)}
+}
+function compressImg(file,maxSize=600){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>h&&w>maxSize){h=h*maxSize/w;w=maxSize}
+      else if(h>maxSize){w=w*maxSize/h;h=maxSize}
+      const c=document.createElement('canvas');
+      c.width=Math.round(w);c.height=Math.round(h);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',.82));
+    };
+    img.onerror=rej;
+    img.src=URL.createObjectURL(file);
+  });
 }
 
 function updateStats(){
